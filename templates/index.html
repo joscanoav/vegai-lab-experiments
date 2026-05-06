@@ -1,51 +1,42 @@
 <!doctype html>
 <html lang="es">
-    
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mi IA SaaS - Panel de Control</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-
-  <body>
+    <title>Vega AI - Panel de Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
     <div class="app-container">
         <aside class="sidebar">
-            <div class="logo-area">
-                <h2>IA Master</h2>
-            </div>
+            <div class="logo-area"><h2>Vega AI</h2></div>
             <nav class="menu-lateral">
-                <button>+ Nuevo Chat</button>
-                <div class="historial">
-                    <p>Historia reciente ...</p>
-                    <ul>
-                        <li>¿Cómo hacer dieta?</li>
-                        <li>Receta de pizza</li>
-                    </ul>
-                </div>
+                <button onclick="nuevoChat()">+ Nuevo Chat</button>
             </nav>
-            <div class="perfil">
-                <span>Usuario Pro</span>
-            </div>
         </aside>
 
         <main class="chat-area">
-            
+            <button class="hamburger-btn">☰</button>
             <header class="chat-header">
                 <h3>Conversación Actual</h3>
             </header>
 
-            <section class="mensajes-container">
-                <div class="mensaje-ia">¡Hola! ¿En qué puedo ayudarte hoy?</div>
-            </section>
+            <section class="mensajes-container" id="chat-box"></section>
 
             <footer class="input-area">
-                <form class="chat-form">
-                    <input type="text" placeholder="Escribe tu pregunta aqui ...">
+                <div class="mode-selector">
+                    <button class="mode-btn active" onclick="setMode('chat', this)">Chat</button>
+                    <button class="mode-btn" onclick="setMode('image', this)">Imagen</button>
+                </div>
+                
+                <form class="chat-form" id="chat-form">
+                    <input type="text" id="user-input" placeholder="Escribe tu mensaje..." required>
                     <button type="submit">Enviar</button>
                 </form>
             </footer>
         </main>
     </div>
-  </body>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
 </html>

@@ -1,148 +1,45 @@
 import os
 from flask import Flask, render_template, request, jsonify, session
-from groq import Groq
+import google.generativeai as genai
 from dotenv import load_dotenv
 
-# -----------------------------
-# CONFIGURACIÓN INICIAL
-# -----------------------------
-
 app = Flask(__name__)
-app.secret_key = "clave_secreta_super_segura"  # necesaria para sesiones
+app.secret_key = "clave_secreta_super_segura"
 
-# -----------------------------
-# FUNCIONES CORE
-# -----------------------------
-
-def cargar_api_key():
-    load_dotenv()
-    api_key = os.environ.get("GROQ_API_KEY")
-
-    if not api_key:
-        raise ValueError("❌ API KEY no encontrada en .env")
-
-    return api_key
-
-
-def crear_cliente_groq(api_key):
-    return Groq(api_key=api_key)
-
+load_dotenv()
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 def obtener_prompt_personalidad():
-    """
-    Aquí defines la personalidad de tu IA
-    """
-    return """
-    Eres un asistente experto en desarrollo de software.
-
-    Características:
-    - Explicas paso a paso
-    - Das ejemplos de código claros
-    - Respondes siempre en español
-    - Eres directo y sin rodeos
-    - Corriges errores del usuario si los detectas
-
-    Estilo:
-    - Profesional pero cercano
-    - Como un desarrollador senior mentor
-
-    Objetivo:
-    - Ayudar a aprender programación de forma práctica
-    """
-
-
-def obtener_respuesta_ia(cliente, historial):
-    """
-    Envía TODO el historial a la IA (memoria)
-    """
-    try:
-        response = cliente.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=historial,
-            temperature=0.7,
-            max_tokens=1024
-        )
-
-        return response.choices[0].message.content
-
-    except Exception as e:
-        return f"⚠️ Error IA: {str(e)}"
-
-
-# -----------------------------
-# RUTAS
-# -----------------------------
+    return "Eres un asistente experto en software, directo y profesional."
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
-    try:
-        data = request.get_json()
-        mensaje_usuario = data.get("mensaje")
+    data = request.get_json()
+    mensaje = data.get("mensaje")
+    
+    if "historial" not in session:
+        session["historial"] = []
+    
+    historial = session["historial"]
+    historial.append({"role": "user", "parts": [mensaje]})
 
-        if not mensaje_usuario:
-            return jsonify({"error": "Mensaje vacío"}), 400
-
-        # -------------------------
-        # INICIALIZAR HISTORIAL
-        # -------------------------
-        if "historial" not in session:
-            session["historial"] = [
-                {"role": "system", "content": obtener_prompt_personalidad()}
-            ]
-
-        historial = session["historial"]
-
-        # Agregar mensaje del usuario
-        historial.append({
-            "role": "user",
-            "content": mensaje_usuario
-        })
-
-        # -------------------------
-        # LLAMADA A IA
-        # -------------------------
-        api_key = cargar_api_key()
-        cliente = crear_cliente_groq(api_key)
-
-        respuesta_ia = obtener_respuesta_ia(cliente, historial)
-
-        # Guardar respuesta en historial
-        historial.append({
-            "role": "assistant",
-            "content": respuesta_ia
-        })
-
-        # Guardar sesión
-        session["historial"] = historial
-
-        return jsonify({"respuesta": respuesta_ia})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+    model = genai.GenerativeModel("gemini-1.0-pro", system_instruction=obtener_prompt_personalidad())
+    chat_session = model.start_chat(history=historial[:-1])
+    
+    response = chat_session.send_message(mensaje)
+    historial.append({"role": "model", "parts": [response.text]})
+    session["historial"] = historial
+    
+    return jsonify({"respuesta": response.text})
 
 @app.route("/reset", methods=["POST"])
-def reset_chat():
-    """
-    Reinicia la conversación
-    """
+def reset():
     session.pop("historial", None)
-    return jsonify({"mensaje": "Chat reiniciado"})
-
-
-# -----------------------------
-# MAIN
-# -----------------------------
-
-def main():
-    print("🚀 Servidor corriendo en http://127.0.0.1:5000")
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
-    main()
+    app.run(port=5000, debug=True)
