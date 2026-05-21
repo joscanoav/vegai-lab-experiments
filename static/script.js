@@ -26,44 +26,49 @@ function setMode(mode, btnElement) {
 // --- LÓGICA DE ENVÍO Y CONEXIÓN CON FLASK ---
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const text = userInput.value;
+    let text = userInput.value;
     if (!text.trim()) return;
 
+    // Si estás en modo imagen, nos aseguramos de que el texto lleve un disparador para el backend
+    if (currentMode === 'image') {
+        const disparadores = ["dibuja", "genera una imagen", "crea una imagen", "hazme un dibujo", "imagen de"];
+        const yaTieneDisparador = disparadores.some(palabra => text.toLowerCase().includes(palabra));
+        if (!yaTieneDisparador) {
+            text = "dibuja " + text;
+        }
+    }
+
     // 1. Añadir mensaje del usuario al chat
-    addMessage(text, 'user');
+    addMessage(userInput.value, 'user'); // Muestra el texto original que escribió el usuario
     userInput.value = '';
 
-    if (currentMode === 'chat') {
-        // 2. Mostrar mensaje de "pensando"
-        addMessage("Vega AI está pensando...", 'ia');
-        const pensandoMsg = chatBox.lastElementChild;
+    // 2. Mostrar mensaje de "pensando" o "generando"
+    const textoPensando = currentMode === 'chat' ? "Vega AI está pensando..." : "Vega AI está generando tu imagen...";
+    addMessage(textoPensando, 'ia');
+    const pensandoMsg = chatBox.lastElementChild;
 
-        try {
-            // 3. Llamada al servidor Flask (Backend)
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mensaje: text })
-            });
+    try {
+        // 3. Llamada al servidor Flask (Backend)
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mensaje: text }) // Enviamos el texto (con el "dibuja " si aplica)
+        });
 
-            const data = await response.json();
-            
-            // 4. Eliminar "pensando" y mostrar respuesta real
-            pensandoMsg.remove();
+        const data = await response.json();
+        
+        // 4. Eliminar "pensando" y mostrar respuesta real
+        pensandoMsg.remove();
 
-            if (data.respuesta) {
-                addMessage(data.respuesta, 'ia');
-            } else {
-                addMessage("Error: " + (data.error || "No hubo respuesta del servidor."), 'ia');
-            }
-        } catch (error) {
-            pensandoMsg.remove();
-            console.error(error);
-            addMessage("Error de conexión. ¿Está el servidor Flask corriendo?", 'ia');
+        if (data.respuesta) {
+            addMessage(data.respuesta, 'ia');
+        } else {
+            addMessage("Error: " + (data.error || "No hubo respuesta del servidor."), 'ia');
         }
-    } else {
-        // Placeholder para modo imagen
-        addMessage("La función de imágenes está en desarrollo.", 'ia');
+    } catch (error) {
+        pensandoMsg.remove();
+        console.error(error);
+        addMessage("Error de conexión. ¿Está el servidor Flask corriendo?", 'ia');
     }
 });
 
@@ -75,7 +80,8 @@ function addMessage(text, sender) {
     // Si el mensaje es de sistema, añadimos clase especial
     if (sender === 'system') bubble.classList.add('bubble-system');
     
-    bubble.innerText = text;
+    // SOLUCIÓN CLAVE: innerHTML interpreta etiquetas <img> en lugar de tratarlas como texto plano
+    bubble.innerHTML = text;
     chatBox.appendChild(bubble);
     
     scrollToBottom();
@@ -86,10 +92,10 @@ function scrollToBottom() {
 }
 
 function nuevoChat() {
-    // Limpiamos solo la interfaz
+    // Limpiamos la interfaz
     chatBox.innerHTML = '';
     
-    // Opcional: Llamar a /reset en el backend si quieres limpiar la memoria de la sesión también
+    // Llamar a /reset en el backend para limpiar la memoria de la sesión también
     fetch('/reset', { method: 'POST' });
 }
 

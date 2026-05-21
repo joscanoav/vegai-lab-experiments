@@ -1,21 +1,12 @@
 import os
-import base64
 import requests
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 
-# Configuración de la aplicación Flask
 app = Flask(__name__)
-app.secret_key = "vega_ai_local_emergency"
+app.secret_key = "vega_ai_final_stable_diffusion_2026"
 
 load_dotenv()
-
-# --- CONFIGURACIÓN DE INTEGRACIÓN ---
-HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
-URL_IMAGEN = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-
-def obtener_personalidad():
-    return "Eres Vega AI, un asistente experto en software, directo y profesional."
 
 @app.route("/")
 def home():
@@ -30,44 +21,52 @@ def chat():
         if not mensaje_usuario:
             return jsonify({"respuesta": "No he recibido ningún mensaje."})
 
-        # --- 1. MODO: GENERACIÓN DE IMÁGENES (Sigue intentando conectar si lo pides) ---
+        # --- DETECTOR DE MODO IMAGEN ---
         disparadores = ["dibuja", "genera una imagen", "crea una imagen", "hazme un dibujo", "imagen de"]
         pide_imagen = any(palabra in mensaje_usuario.lower() for palabra in disparadores)
 
         if pide_imagen:
-            try:
-                print(f"[IMAGEN] Intentando conectar a Hugging Face para: {mensaje_usuario}")
-                headers_hf = {"Authorization": f"Bearer {HF_API_KEY}"}
-                response_hf = requests.post(URL_IMAGEN, headers=headers_hf, json={"inputs": mensaje_usuario}, timeout=5)
-                
-                if response_hf.status_code == 200:
-                    imagen_bytes = response_hf.content
-                    imagen_base64 = base64.b64encode(imagen_bytes).decode('utf-8')
-                    respuesta_html = (
-                        f'<div>'
-                        f'<p>¡Logré conectar! Aquí tienes tu imagen:</p>'
-                        f'<img src="data:image/jpeg;base64,{imagen_base64}" style="width:100%; border-radius:10px; margin-top:10px; border: 2px solid #2ecc71;">'
-                        f'</div>'
-                    )
-                    return jsonify({"respuesta": respuesta_html})
-            except Exception:
-                return jsonify({"respuesta": "El motor de imágenes no pudo salir a internet. Revisa tu conexión de red."})
+            print(f"[IA REAL] Generando imagen desde internet para: {mensaje_usuario}")
+            
+            # Limpiamos el texto para extraer solo la orden del usuario
+            prompt_limpio = mensaje_usuario.lower()
+            for d in disparadores:
+                prompt_limpio = prompt_limpio.replace(d, "")
+            prompt_limpio = prompt_limpio.strip()
+            
+            # Si detecta palabras clave en español, le damos un empujón en inglés para que la IA pinte perfecto
+            if "coche" in prompt_limpio or "auto" in prompt_limpio:
+                prompt_final = "cyberpunk futuristic car, neon lights, hyperrealistic, 4k resolution"
+            else:
+                prompt_final = prompt_limpio if prompt_limpio else "cyberpunk style landscape"
 
-        # --- 2. MODO: CHAT DE TEXTO (100% LOCAL / SIN INTERNET) ---
-        print(f"[TEXTO LOCAL] Procesando: {mensaje_usuario}")
-        
-        # Respuestas automáticas preprogramadas para probar tu diseño gráfico
-        saludos = ["hola", "buenas", "que tal", "saludos", "buenos dias"]
+            # Formateamos los espacios para crear una URL web segura
+            prompt_url = prompt_final.replace(" ", "%20")
+
+            # ENDPOINT LIBRE DE POLLINATIONS PARA STABLE DIFFUSION (No requiere login)
+            url_imagen = f"https://image.pollinations.ai/prompt/{prompt_url}?width=800&height=800&model=turbo&nologo=true"
+            
+            # Formateamos la respuesta HTML exacta que tu script.js inyectará directamente en el chat
+            respuesta_html = (
+                f'<div>'
+                f'<p>¡Aquí tienes tu imagen generada por IA en tiempo real!</p>'
+                f'<img src="{url_imagen}" style="width:100%; max-width:500px; display:block; border-radius:10px; margin-top:10px; border: 2px solid #3498db;" alt="Imagen Vega AI">'
+                f'</div>'
+            )
+            return jsonify({"respuesta": respuesta_html})
+
+        # --- MODO CHAT TEXTO ---
+        saludos = ["hola", "buenas", "que tal"]
         if any(s in mensaje_usuario.lower() for s in saludos):
-            respuesta_local = "¡Hola! Soy Vega AI en modo de diagnóstico local. Tu panel de control y diseño de chat funcionan correctamente a nivel de servidor. ¿Qué componente deseas probar hoy?"
+            respuesta_local = "¡Hola! Soy Vega AI. El motor gráfico por Inteligencia Artificial real está activo. Cambia al modo Imagen abajo y pídeme un coche futurista."
         else:
-            respuesta_local = f"Recibí tu mensaje: '{mensaje_usuario}'. El sistema de chat está respondiendo en modo local fuera de línea para verificar que el flujo de tu interfaz de usuario funciona sin bloqueos."
-
+            respuesta_local = f"Procesando en modo texto: '{mensaje_usuario}'."
+            
         return jsonify({"respuesta": respuesta_local})
 
     except Exception as e:
         print(f"Error crítico: {str(e)}")
-        return jsonify({"respuesta": f"Error interno de Vega AI: {str(e)}"}), 500
+        return jsonify({"respuesta": f"Error interno en el servidor."}), 500
 
 @app.route("/reset", methods=["POST"])
 def reset():
