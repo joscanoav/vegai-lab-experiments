@@ -9,7 +9,12 @@
 <body>
     <div class="app-container">
         <aside class="sidebar">
-            <div class="logo-area"><h2>Vega AI</h2></div>
+            <div class="logo-area">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vega AI" class="logo-img">
+                    <h2>Vega AI</h2>
+                </div>
+            </div>
             <nav class="menu-lateral">
                 <button onclick="nuevoChat()">+ Nuevo Chat</button>
             </nav>
