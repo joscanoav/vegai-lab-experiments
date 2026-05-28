@@ -103,3 +103,17 @@ function nuevoChat() {
 const btn = document.querySelector('.hamburger-btn');
 const sidebar = document.querySelector('.sidebar');
 btn.addEventListener('click', () => sidebar.classList.toggle('active'));
+
+// --- LÓGICA DE INTERCAMBIO DE TEMA (MODO CLARO / OSCURO) ---
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const themeButton = document.getElementById('theme-toggle');
+    
+    if (currentTheme === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        themeButton.innerHTML = '☀️ Modo Claro';
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeButton.innerHTML = '🌙 Modo Oscuro';
+    }
+}
