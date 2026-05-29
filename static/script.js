@@ -23,13 +23,12 @@ function setMode(mode, btnElement) {
     chatBox.appendChild(systemMsg);
 }
 
-// --- LÓGICA DE ENVÍO Y CONEXIÓN CON FLASK ---
+// --- LÓGICA DE ENVÍO E INTERACCIÓN ---
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     let text = userInput.value;
     if (!text.trim()) return;
 
-    // Si estás en modo imagen, nos aseguramos de que el texto lleve un disparador para el backend
     if (currentMode === 'image') {
         const disparadores = ["dibuja", "genera una imagen", "crea una imagen", "hazme un dibujo", "imagen de"];
         const yaTieneDisparador = disparadores.some(palabra => text.toLowerCase().includes(palabra));
@@ -38,30 +37,135 @@ chatForm.addEventListener('submit', async (e) => {
         }
     }
 
-    // 1. Añadir mensaje del usuario al chat
-    addMessage(userInput.value, 'user'); // Muestra el texto original que escribió el usuario
+    addMessage(userInput.value, 'user');
     userInput.value = '';
 
-    // 2. Mostrar mensaje de "pensando" o "generando"
     const textoPensando = currentMode === 'chat' ? "Vega AI está pensando..." : "Vega AI está generando tu imagen...";
     addMessage(textoPensando, 'ia');
     const pensandoMsg = chatBox.lastElementChild;
 
     try {
-        // 3. Llamada al servidor Flask (Backend)
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mensaje: text }) // Enviamos el texto (con el "dibuja " si aplica)
+            body: JSON.stringify({ mensaje: text })
         });
 
         const data = await response.json();
-        
-        // 4. Eliminar "pensando" y mostrar respuesta real
         pensandoMsg.remove();
 
         if (data.respuesta) {
             addMessage(data.respuesta, 'ia');
+            
+            if (data.tiene_tabla && data.tabla_html) {
+                const ultimaBurbujaIa = chatBox.lastElementChild;
+                
+                const wrapperBotones = document.createElement('div');
+                wrapperBotones.className = 'export-container';
+                wrapperBotones.style.cssText = 'display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;';
+                
+                // ==========================================
+                // 1. BOTÓN DE EXCEL
+                // ==========================================
+                const formExcel = document.createElement('form');
+                formExcel.action = '/exportar-excel';
+                formExcel.method = 'POST';
+                formExcel.target = '_blank';
+                formExcel.style.margin = '0';
+                
+                const inputData = document.createElement('input');
+                inputData.type = 'hidden';
+                inputData.name = 'tabla_data';
+                inputData.value = data.tabla_html;
+                
+                const botonExcel = document.createElement('button');
+                botonExcel.type = 'submit';
+                botonExcel.className = 'btn-export btn-excel';
+                botonExcel.style.cssText = 'background: #22c55e; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease-in-out;';
+                botonExcel.innerHTML = '📊 Descargar en Excel';
+                
+                botonExcel.onmouseover = () => { botonExcel.style.background = '#16a34a'; botonExcel.style.transform = 'translateY(-1px)'; };
+                botonExcel.onmouseout = () => { botonExcel.style.background = '#22c55e'; botonExcel.style.transform = 'translateY(0)'; };
+                
+                formExcel.appendChild(inputData);
+                formExcel.appendChild(botonExcel);
+                wrapperBotones.appendChild(formExcel);
+
+                // ==========================================
+                // 2. BOTÓN DE PDF (MÁXIMA SEPARACIÓN ANTI-SOLAPAMIENTO)
+                // ==========================================
+                const botonPdf = document.createElement('button');
+                botonPdf.type = 'button';
+                botonPdf.className = 'btn-export btn-pdf';
+                botonPdf.style.cssText = 'background: #ef4444; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease-in-out;';
+                botonPdf.innerHTML = '📄 Descargar en PDF';
+                
+                botonPdf.onmouseover = () => { botonPdf.style.background = '#dc2626'; botonPdf.style.transform = 'translateY(-1px)'; };
+                botonPdf.onmouseout = () => { botonPdf.style.background = '#ef4444'; botonPdf.style.transform = 'translateY(0)'; };
+                
+                botonPdf.addEventListener('click', () => {
+                    const tablaObjetivo = ultimaBurbujaIa.querySelector('table');
+                    const parrafoIntro = ultimaBurbujaIa.querySelector('p');
+                    const descripcionTexto = parrafoIntro ? parrafoIntro.innerText : "Reporte analítico de mercado estructurado.";
+
+                    if (tablaObjetivo) {
+                        const ventanaImpresion = window.open('', '_blank');
+                        ventanaImpresion.document.write(`
+                            <html>
+                            <head>
+                                <meta charset="UTF-8">
+                                <title>Vega AI - Reporte Analítico</title>
+                                <style>
+                                    @media print {
+                                        body {
+                                            -webkit-print-color-adjust: exact;
+                                            print-color-adjust: exact;
+                                        }
+                                    }
+                                    body { 
+                                        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                                        color: #0f172a; 
+                                        margin: 50px; 
+                                        line-height: 1.6;
+                                        /* Correcciones críticas de tracking para el bug de la 'l' */
+                                        letter-spacing: 0.03em !important;
+                                        word-spacing: 0.05em;
+                                        transform: translateZ(0);
+                                        -webkit-transform: translateZ(0);
+                                    }
+                                    .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 25px; }
+                                    h1 { color: #1e3a8a; font-size: 24px; margin: 0; font-weight: 700; letter-spacing: 0.02em; }
+                                    .meta-tag { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; font-weight: bold; }
+                                    .intro-text { color: #334155; font-size: 14px; margin-bottom: 30px; background: #f8fafc; padding: 15px; border-left: 4px solid #64748b; border-radius: 4px; }
+                                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; text-align: left; }
+                                    th { background-color: #0f172a; color: #ffffff; padding: 12px 14px; font-weight: 600; letter-spacing: 0.03em; }
+                                    td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; letter-spacing: 0.03em; }
+                                    tr:nth-child(even) td { background-color: #f8fafc; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="header">
+                                    <span class="meta-tag">Vega AI • Documento Ejecutivo</span>
+                                    <h1>Reporte de Datos Estructurados</h1>
+                                </div>
+                                <div class="intro-text">${descripcionTexto}</div>
+                                ${tablaObjetivo.outerHTML}
+                                <script>
+                                    window.onload = function() { 
+                                        setTimeout(() => { window.print(); window.close(); }, 350); 
+                                    }
+                                </script>
+                            </body>
+                            </html>
+                        `);
+                        ventanaImpresion.document.close();
+                    }
+                });
+                
+                wrapperBotones.appendChild(botonPdf);
+                ultimaBurbujaIa.appendChild(wrapperBotones);
+                scrollToBottom();
+            }
         } else {
             addMessage("Error: " + (data.error || "No hubo respuesta del servidor."), 'ia');
         }
@@ -76,14 +180,9 @@ chatForm.addEventListener('submit', async (e) => {
 function addMessage(text, sender) {
     const bubble = document.createElement('div');
     bubble.classList.add('bubble', sender === 'user' ? 'bubble-user' : 'bubble-ia');
-    
-    // Si el mensaje es de sistema, añadimos clase especial
     if (sender === 'system') bubble.classList.add('bubble-system');
-    
-    // SOLUCIÓN CLAVE: innerHTML interpreta etiquetas <img> en lugar de tratarlas como texto plano
     bubble.innerHTML = text;
     chatBox.appendChild(bubble);
-    
     scrollToBottom();
 }
 
@@ -92,23 +191,19 @@ function scrollToBottom() {
 }
 
 function nuevoChat() {
-    // Limpiamos la interfaz
     chatBox.innerHTML = '';
-    
-    // Llamar a /reset en el backend para limpiar la memoria de la sesión también
     fetch('/reset', { method: 'POST' });
 }
 
-// --- MENÚ HAMBURGUESA ---
 const btn = document.querySelector('.hamburger-btn');
 const sidebar = document.querySelector('.sidebar');
-btn.addEventListener('click', () => sidebar.classList.toggle('active'));
+if(btn && sidebar) {
+    btn.addEventListener('click', () => sidebar.classList.toggle('active'));
+}
 
-// --- LÓGICA DE INTERCAMBIO DE TEMA (MODO CLARO / OSCURO) ---
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme');
     const themeButton = document.getElementById('theme-toggle');
-    
     if (currentTheme === 'light') {
         document.documentElement.removeAttribute('data-theme');
         themeButton.innerHTML = '☀️ Modo Claro';
